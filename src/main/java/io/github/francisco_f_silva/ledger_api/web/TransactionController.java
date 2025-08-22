@@ -1,18 +1,21 @@
 package io.github.francisco_f_silva.ledger_api.web;
 
+import com.google.common.collect.Range;
 import io.github.francisco_f_silva.ledger_api.model.Transaction;
 import io.github.francisco_f_silva.ledger_api.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.jspecify.annotations.NonNull;
+import org.springframework.web.bind.annotation.*;
 
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static java.time.ZoneOffset.UTC;
@@ -26,6 +29,20 @@ public class TransactionController {
   public TransactionController(Clock clock, TransactionService service) {
     this.clock = clock;
     this.service = service;
+  }
+
+  @GetMapping("/transactions")
+  @Operation(
+      summary = "Fetches transactions",
+      description =
+          "Returns a list of transactions filtered according to parameters and sorted from newest to oldest.")
+  public List<TransactionResponseDto> getTransactions(
+      @RequestParam(required = false) OffsetDateTime from,
+      @RequestParam(required = false) OffsetDateTime to) {
+    Range<@NonNull Instant> timeRange = buildRange(from, to);
+    return service.getTransactions(timeRange).stream()
+        .map(TransactionController::toResponseDto)
+        .toList();
   }
 
   @PostMapping("/transactions")
@@ -48,12 +65,31 @@ public class TransactionController {
         dto.occurredAt().map(OffsetDateTime::toInstant).orElse(Instant.now(clock)));
   }
 
-  private TransactionResponseDto toResponseDto(Transaction transaction) {
+  private static TransactionResponseDto toResponseDto(Transaction transaction) {
     return new TransactionResponseDto(
         transaction.getId(),
         transaction.getType(),
         transaction.getDescription(),
         transaction.getAmount(),
         transaction.getOccurredAt().atOffset(UTC));
+  }
+
+  private static Range<@NonNull Instant> buildRange(
+      @Nullable OffsetDateTime from, @Nullable OffsetDateTime to) {
+    Optional<Instant> fromOptional = Optional.ofNullable(from).map(OffsetDateTime::toInstant);
+    Optional<Instant> toOptional = Optional.ofNullable(to).map(OffsetDateTime::toInstant);
+
+    if (toOptional.isEmpty()) {
+      return fromOptional.map(Range::atLeast).orElse(Range.all());
+    }
+    Instant toUtc = toOptional.orElseThrow();
+    if (fromOptional.isEmpty()) {
+      return Range.atMost(toUtc);
+    }
+    Instant fromUtc = fromOptional.orElseThrow();
+    if (!fromUtc.isBefore(toUtc)) {
+      throw new BadRequestException("'from' must be before 'to'");
+    }
+    return Range.closed(fromUtc, toUtc);
   }
 }
