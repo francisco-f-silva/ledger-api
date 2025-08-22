@@ -6,6 +6,7 @@ import io.github.francisco_f_silva.ledger_api.repo.TransactionRepository;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -29,7 +30,22 @@ public class TransactionService {
         .toList();
   }
 
+  /** Stores the given transaction. */
   public Transaction addTransaction(Transaction transaction) {
     return repository.addTransaction(transaction);
+  }
+
+  /** Calculates current balance based on transaction history. */
+  public BigDecimal calculateCurrentBalance() {
+    return repository.getAllTransactions().stream()
+        .map(this::extractSignedAmount)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private BigDecimal extractSignedAmount(Transaction transaction) {
+    return switch (transaction.getType()) {
+      case DEPOSIT -> transaction.getAmount();
+      case WITHDRAWAL -> transaction.getAmount().negate();
+    };
   }
 }

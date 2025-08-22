@@ -10,12 +10,12 @@ import jakarta.validation.Valid;
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static java.time.ZoneOffset.UTC;
@@ -33,7 +33,7 @@ public class TransactionController {
 
   @GetMapping("/transactions")
   @Operation(
-      summary = "Fetches transactions",
+      summary = "Fetch transactions",
       description =
           "Returns a list of transactions filtered according to parameters and sorted from newest to oldest.")
   public List<TransactionResponseDto> getTransactions(
@@ -56,6 +56,15 @@ public class TransactionController {
     return toResponseDto(createdTransaction);
   }
 
+  @GetMapping("/balance")
+  @Operation(
+      summary = "View balance",
+      description = "Returns current balance. Can be positive, zero, or negative.")
+  public BalanceDto viewBalance() {
+    BigDecimal balance = service.calculateCurrentBalance();
+    return new BalanceDto(balance);
+  }
+
   private Transaction toTransaction(TransactionRequestDto dto) {
     return new Transaction(
         UUID.randomUUID(),
@@ -76,20 +85,16 @@ public class TransactionController {
 
   private static Range<@NonNull Instant> buildRange(
       @Nullable OffsetDateTime from, @Nullable OffsetDateTime to) {
-    Optional<Instant> fromOptional = Optional.ofNullable(from).map(OffsetDateTime::toInstant);
-    Optional<Instant> toOptional = Optional.ofNullable(to).map(OffsetDateTime::toInstant);
+    @Nullable Instant fromUtc = from != null ? from.toInstant() : null;
+    @Nullable Instant toUtc = to != null ? to.toInstant() : null;
 
-    if (toOptional.isEmpty()) {
-      return fromOptional.map(Range::atLeast).orElse(Range.all());
-    }
-    Instant toUtc = toOptional.orElseThrow();
-    if (fromOptional.isEmpty()) {
-      return Range.atMost(toUtc);
-    }
-    Instant fromUtc = fromOptional.orElseThrow();
-    if (!fromUtc.isBefore(toUtc)) {
+    if (fromUtc != null && toUtc != null && !fromUtc.isBefore(toUtc)) {
       throw new BadRequestException("'from' must be before 'to'");
     }
-    return Range.closed(fromUtc, toUtc);
+
+    if (fromUtc != null && toUtc != null) return Range.closed(fromUtc, toUtc);
+    if (fromUtc != null) return Range.atLeast(fromUtc);
+    if (toUtc != null) return Range.atMost(toUtc);
+    return Range.all();
   }
 }
