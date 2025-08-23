@@ -21,6 +21,7 @@ import java.util.UUID;
 import static java.time.ZoneOffset.UTC;
 
 @RestController
+@RequestMapping("/api")
 @Tag(name = "Transactions", description = "Handles deposits, withdrawals, and related balance.")
 public class TransactionController {
   private final Clock clock;
