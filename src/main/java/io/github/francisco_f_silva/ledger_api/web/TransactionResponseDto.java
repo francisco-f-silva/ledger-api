@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record TransactionResponseDto(
@@ -14,4 +14,4 @@ public record TransactionResponseDto(
     @NotNull TransactionType type,
     @NotBlank String description,
     @NotNull @Positive BigDecimal amount,
-    @NotNull OffsetDateTime occurredAt) {}
+    @NotNull Instant occurredAt) {}

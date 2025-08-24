@@ -14,11 +14,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
-
-import static java.time.ZoneOffset.UTC;
 
 @RestController
 @RequestMapping("/api")
@@ -38,8 +35,7 @@ public class TransactionController {
       description =
           "Returns a list of transactions filtered according to parameters and sorted from newest to oldest.")
   public List<TransactionResponseDto> getTransactions(
-      @RequestParam(required = false) OffsetDateTime from,
-      @RequestParam(required = false) OffsetDateTime to) {
+      @RequestParam(required = false) Instant from, @RequestParam(required = false) Instant to) {
     Range<@NonNull Instant> timeRange = buildRange(from, to);
     return service.getTransactions(timeRange).stream()
         .map(TransactionController::toResponseDto)
@@ -53,8 +49,12 @@ public class TransactionController {
           "Records a deposit or withdrawal. Supports only Euros as currency. Amount must be positive. Uses current UTC time if none is provided.")
   public TransactionResponseDto createTransaction(
       @Valid @RequestBody TransactionRequestDto request) {
-    Transaction createdTransaction = service.addTransaction(toTransaction(request));
-    return toResponseDto(createdTransaction);
+    try {
+      Transaction createdTransaction = service.addTransaction(toTransaction(request));
+      return toResponseDto(createdTransaction);
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException(e.getMessage(), e);
+    }
   }
 
   @GetMapping("/balance")
@@ -72,7 +72,7 @@ public class TransactionController {
         dto.type(),
         dto.description(),
         dto.amount().setScale(2, RoundingMode.HALF_UP),
-        dto.occurredAt().map(OffsetDateTime::toInstant).orElse(Instant.now(clock)));
+        dto.occurredAt().orElse(Instant.now(clock)));
   }
 
   private static TransactionResponseDto toResponseDto(Transaction transaction) {
@@ -81,21 +81,17 @@ public class TransactionController {
         transaction.getType(),
         transaction.getDescription(),
         transaction.getAmount(),
-        transaction.getOccurredAt().atOffset(UTC));
+        transaction.getOccurredAt());
   }
 
-  private static Range<@NonNull Instant> buildRange(
-      @Nullable OffsetDateTime from, @Nullable OffsetDateTime to) {
-    @Nullable Instant fromUtc = from != null ? from.toInstant() : null;
-    @Nullable Instant toUtc = to != null ? to.toInstant() : null;
-
-    if (fromUtc != null && toUtc != null && !fromUtc.isBefore(toUtc)) {
+  private static Range<@NonNull Instant> buildRange(@Nullable Instant from, @Nullable Instant to) {
+    if (from != null && to != null && !from.isBefore(to)) {
       throw new BadRequestException("'from' must be before 'to'");
     }
 
-    if (fromUtc != null && toUtc != null) return Range.closed(fromUtc, toUtc);
-    if (fromUtc != null) return Range.atLeast(fromUtc);
-    if (toUtc != null) return Range.atMost(toUtc);
+    if (from != null && to != null) return Range.closed(from, to);
+    if (from != null) return Range.atLeast(from);
+    if (to != null) return Range.atMost(to);
     return Range.all();
   }
 }

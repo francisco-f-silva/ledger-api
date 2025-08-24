@@ -7,15 +7,18 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class TransactionService {
+  private final Clock clock;
   private final TransactionRepository repository;
 
-  public TransactionService(TransactionRepository repository) {
+  public TransactionService(Clock clock, TransactionRepository repository) {
+    this.clock = clock;
     this.repository = repository;
   }
 
@@ -32,6 +35,9 @@ public class TransactionService {
 
   /** Stores the given transaction. */
   public Transaction addTransaction(Transaction transaction) {
+    if (transaction.getOccurredAt().isAfter(Instant.now(clock))) {
+      throw new IllegalArgumentException("'occurredAt' can not be in the future");
+    }
     return repository.addTransaction(transaction);
   }
 

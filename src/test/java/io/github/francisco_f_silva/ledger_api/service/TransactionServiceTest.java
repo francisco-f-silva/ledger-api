@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -16,9 +17,11 @@ import java.util.UUID;
 
 import static io.github.francisco_f_silva.ledger_api.model.TransactionType.DEPOSIT;
 import static io.github.francisco_f_silva.ledger_api.model.TransactionType.WITHDRAWAL;
+import static java.time.ZoneOffset.UTC;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static java.time.temporal.ChronoUnit.HOURS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests the service layer. For simplicity and more thorough testing, it does NOT mock the
@@ -26,12 +29,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * be changed.
  */
 public class TransactionServiceTest {
-  private static final Instant now = Instant.parse("2025-08-22T10:00:00Z");
+  private static final Instant NOW = Instant.parse("2025-08-22T10:00:00Z");
+  private static final Clock CLOCK = Clock.fixed(NOW, UTC);
   private static final Transaction T1_DEPOSIT =
-      transaction(DEPOSIT, BigDecimal.valueOf(35.5), now.minus(2, DAYS));
+      transaction(DEPOSIT, BigDecimal.valueOf(35.5), NOW.minus(2, DAYS));
   private static final Transaction T2_WITHDRAWAL =
-      transaction(WITHDRAWAL, BigDecimal.valueOf(15.5), now.minus(1, DAYS));
-  private static final Transaction T3_DEPOSIT = transaction(DEPOSIT, BigDecimal.valueOf(2.35), now);
+      transaction(WITHDRAWAL, BigDecimal.valueOf(15.5), NOW.minus(1, DAYS));
+  private static final Transaction T3_DEPOSIT = transaction(DEPOSIT, BigDecimal.valueOf(2.35), NOW);
 
   /** Actual (NOT mocked) in-memory repository. */
   private TransactionRepository repository;
@@ -42,7 +46,7 @@ public class TransactionServiceTest {
   @BeforeEach
   void setUp() {
     repository = new TransactionRepository();
-    service = new TransactionService(repository);
+    service = new TransactionService(CLOCK, repository);
   }
 
   @DisplayName("Should return empty list when no transaction exists")
@@ -65,7 +69,7 @@ public class TransactionServiceTest {
   @Test
   void getTransactions3() {
     storeTransactions(T1_DEPOSIT, T2_WITHDRAWAL, T3_DEPOSIT);
-    List<Transaction> result = service.getTransactions(Range.atLeast(now.minus(30, HOURS)));
+    List<Transaction> result = service.getTransactions(Range.atLeast(NOW.minus(30, HOURS)));
     assertThat(result).containsExactly(T3_DEPOSIT, T2_WITHDRAWAL);
   }
 
@@ -73,7 +77,7 @@ public class TransactionServiceTest {
   @Test
   void getTransactions4() {
     storeTransactions(T1_DEPOSIT, T2_WITHDRAWAL, T3_DEPOSIT);
-    List<Transaction> result = service.getTransactions(Range.atMost(now.minus(30, HOURS)));
+    List<Transaction> result = service.getTransactions(Range.atMost(NOW.minus(30, HOURS)));
     assertThat(result).containsExactly(T1_DEPOSIT);
   }
 
@@ -83,7 +87,7 @@ public class TransactionServiceTest {
   void getTransactions5() {
     storeTransactions(T1_DEPOSIT, T2_WITHDRAWAL, T3_DEPOSIT);
     List<Transaction> result =
-        service.getTransactions(Range.closed(now.minus(30, HOURS), now.minus(20, HOURS)));
+        service.getTransactions(Range.closed(NOW.minus(30, HOURS), NOW.minus(20, HOURS)));
     assertThat(result).containsExactly(T2_WITHDRAWAL);
   }
 
@@ -96,9 +100,17 @@ public class TransactionServiceTest {
         .containsExactlyInAnyOrder(T1_DEPOSIT, T2_WITHDRAWAL);
   }
 
-  @DisplayName("Should support adding transactions older than other existing transactions")
+  @DisplayName("Fails when adding transactions in the future")
   @Test
   void addTransactions2() {
+    Transaction futureTransaction = transaction(DEPOSIT, BigDecimal.ONE, NOW.plus(1, DAYS));
+    assertThatThrownBy(() -> service.addTransaction(futureTransaction))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @DisplayName("Should support adding transactions older than other existing transactions")
+  @Test
+  void addTransactions3() {
     service.addTransaction(T1_DEPOSIT);
     service.addTransaction(T3_DEPOSIT);
     service.addTransaction(T2_WITHDRAWAL);
@@ -125,7 +137,7 @@ public class TransactionServiceTest {
   @Test
   void calculateCurrentBalance3() {
     storeTransactions(
-        T1_DEPOSIT, T2_WITHDRAWAL, transaction(WITHDRAWAL, BigDecimal.valueOf(30), now));
+        T1_DEPOSIT, T2_WITHDRAWAL, transaction(WITHDRAWAL, BigDecimal.valueOf(30), NOW));
     BigDecimal result = service.calculateCurrentBalance();
     assertThat(result).isEqualTo(BigDecimal.valueOf(-10.0));
   }

@@ -5,20 +5,17 @@ A small REST API to record deposits and withdrawals, view transaction history, a
 This project uses **Maven** and is implemented in **Java 21** using **Spring Boot** and **Spring Web MVC**.
 It uses an **in-memory repository**, so no database setup is required.
 
----
-
 ## Assumptions
 
 - Only **one user** and **one account** are supported.
 - Transactions are stored in **Euros**, with **two decimal places**.
 - All transaction amounts are **positive**; withdrawals are treated as negative for balance calculation.
 - **Negative balances are allowed**; no validation is performed to prevent overdrafts.
-- Timestamps are stored in **UTC**. Requests for transaction creation can optionally provide `occurredAt`; otherwise,
-  the current UTC time is used.
-- Transactions can be added retroactively, even if a more recent transaction already exists.
+- Timestamps are stored in **UTC**. Similarly, the API only supports UTC. If no timestamp is given for a transaction,
+  current UTC time will be used.
+- Transactions with timestamps in the future are not allowed.
+- Transactions can be added retroactively, even when a more recent transaction already exists.
 - Only one transaction can be created at a time.
-
----
 
 ## Build & Run
 
@@ -53,9 +50,6 @@ http://localhost:8080/swagger-ui.html
 ```
 
 ![Swagger UI](docs/swagger.png)
-
-
----
 
 ## API Endpoints
 
@@ -171,8 +165,6 @@ curl -X 'GET' \
   'http://localhost:8080/api/transactions?from=2025-08-22T12:00:00Z&to=2025-08-24T20:00:00Z' \
   -H 'accept: application/json'
 ```
-
----
 
 ## Testing
 

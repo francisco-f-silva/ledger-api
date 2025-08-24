@@ -6,11 +6,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Optional;
 
 public record TransactionRequestDto(
     @NotNull TransactionType type,
     @NotBlank String description,
     @NotNull @Positive BigDecimal amount,
-    Optional<OffsetDateTime> occurredAt) {}
+    Optional<Instant> occurredAt) {}
