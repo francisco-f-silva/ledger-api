@@ -46,7 +46,8 @@ public class TransactionController {
   @Operation(
       summary = "Create a new transaction",
       description =
-          "Records a deposit or withdrawal. Supports only Euros as currency. Amount must be positive. Uses current UTC time if none is provided.")
+          "Records a deposit or withdrawal. Supports only Euros as currency. Amount must be positive. "
+              + "Accepts a UTC timestamp in the past, or uses current UTC time if none is provided.")
   public TransactionResponseDto createTransaction(
       @Valid @RequestBody TransactionRequestDto request) {
     try {
